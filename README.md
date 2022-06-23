@@ -1,5 +1,9 @@
 # Masked Autoencoders As Spatiotemporal Learners
-This is an unofficial PyTorch/GPU implementation of [Masked Autoencoders As Spatiotemporal Learners](https://arxiv.org/abs/2205.09113).
+<p align="center">
+<img width="805" alt="3D MAE Concept" src="https://user-images.githubusercontent.com/1841186/175248621-006c8f76-f838-4795-aaf6-df9a1d23d7ba.png">
+</p>
+
+This is an unofficial PyTorch/GPU implementation of [Masked Autoencoders As Spatiotemporal Learners](https://arxiv.org/abs/2205.09113)
 
 ```
 @Article{STMaskedAutoencoders2022,
@@ -11,11 +15,11 @@ This is an unofficial PyTorch/GPU implementation of [Masked Autoencoders As Spat
 ```
 
 ## TODOs
-- [x] Add pretraining code
+- [x] Add pre-training code
 - [x] Switch to learned spatiotemporal embedding
-- [ ] Test code on surgical dataset (only 200 videos left to process)
-- [ ] Add visualization code
-- [ ] (OPTIONAL) Add prospective and retrospective frame masking 
+- [x] Add visualization code
+- [ ] Test code
+- [ ] Add prospective and retrospective frame masking 
 
 
 ## Getting Started
@@ -32,7 +36,7 @@ $ pip install wandb
 
 ## Pretraining
 ### Dataset Preparation
-In order to perform large-scale pretraining, your data should be organized in the following way:
+In order to perform large-scale pre-training, your data should be organized in the following way:
 ```
 dataset
 │
@@ -62,7 +66,7 @@ video_3 1 323 0
 Fast and efficient loading of video data for training is done using the [VideoFrameDataset](https://github.com/RaivoKoot/Video-Dataset-Loading-Pytorch) library:
 
 ```python
-dataset_train = VideoFrameDataset(root_path:str, annotationfile_path: str, num_segments:int, frames_per_segment:int, transform:None, test_mode:bool)
+dataset_train = VideoFrameDataset(root_path:str, annotationfile_path:str, num_segments:int, frames_per_segment:int, transform:None, test_mode:bool)
 ```
 where each video is split into even `num_segments`, from which a random start index is sampled and `frames_per_segment` consecutive frames are loaded.
 
