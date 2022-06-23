@@ -12,7 +12,7 @@
 import os
 from PIL import Image
 from torchvision import transforms
-from util.dataloader import VideoFrameDataset
+from utils.dataloader import VideoFrameDataset
 
 from timm.data import create_transform
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD

@@ -18,7 +18,7 @@ import torch.nn as nn
 from einops import rearrange
 
 from timm.models.vision_transformer import Block
-from util.patch_embed import PatchEmbed3D
+from utils.patch_embed import PatchEmbed3D
 
 
 class MAE3D(nn.Module):
@@ -38,7 +38,6 @@ class MAE3D(nn.Module):
         self.in_chans = in_chans
         self.embed_dim = embed_dim
         self.decoder_embed_dim = decoder_embed_dim
-        num_patches = self.patch_embed.num_patches
 
         # Class token
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
@@ -112,7 +111,7 @@ class MAE3D(nn.Module):
         imgs: (N, 3, T, H, W)
         x: (N, L, patch_size**2 *3 *temp_stride)
         """
-        x = rearrange(imgs, 'b c (t p0) (h p1) (w p2) -> b (t h w) (p0 p1 p2) c', p0=self.temp_stride, p1=self.patch_embed.patch_size[0], p2=self.patch_embed.patch_size[1])
+        x = rearrange(imgs, 'b c (t p0) (h p1) (w p2) -> b (t h w) (p0 p1 p2) c', p0=self.temp_stride, p1=self.patch_embed.patch_size[1], p2=self.patch_embed.patch_size[2])
         x = rearrange(x, 'b n p c -> b n (p c)')
         return x
 
@@ -121,7 +120,7 @@ class MAE3D(nn.Module):
         x: (N, L, patch_size**2 *3 *temp_stride)
         imgs: (N, 3, T, H, W)
         """
-        x = rearrange(x, 'b (t h w) (p0 p1 p2 c) -> b c (t p0) (h p1) (w p2)', p1=self.patch_embed.patch_size[0], p2=self.patch_embed.patch_size[1], c=self.in_chans, h=self.patch_embed.grid_size[0], w=self.patch_embed.grid_size[1])
+        x = rearrange(x, 'b (t h w) (p0 p1 p2 c) -> b c (t p0) (h p1) (w p2)', p1=self.patch_embed.patch_size[1], p2=self.patch_embed.patch_size[2], c=self.in_chans, h=self.patch_embed.grid_size[1], w=self.patch_embed.grid_size[2])
         return x
 
     def random_masking(self, x, mask_ratio):
@@ -202,7 +201,6 @@ class MAE3D(nn.Module):
 
         # remove cls token
         x = x[:, 1:, :]
-
         return x
 
     def forward_loss(self, imgs, pred, mask):
@@ -216,7 +214,6 @@ class MAE3D(nn.Module):
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1.e-6)**.5
-
         loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)  # [N, L], mean loss per patch
 

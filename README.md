@@ -78,7 +78,7 @@ $ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_no
 More training options and parameters can be viewed and modified in `main_pretrain.py`.
 
 ### Visualization
-Coming soon.
+A visualization of MAE-3D can be found in the included [interactive notebook](https://github.com/cyrilzakka/MAE3D/blob/main/mae3d_visualize.ipynb).
 
 ## License
 This project is under the CC-BY-NC 4.0 license. See [LICENSE](https://github.com/cyrilzakka/mae3d/blob/main/LICENSE) for details.

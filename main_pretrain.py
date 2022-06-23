@@ -23,9 +23,9 @@ import torchvision.transforms as transforms
 
 import timm.optim.optim_factory as optim_factory
 
-import util.misc as misc
-from util.misc import NativeScalerWithGradNormCount as NativeScaler
-from util.datasets import VideoFrameDataset
+import utils.misc as misc
+from utils.misc import NativeScalerWithGradNormCount as NativeScaler
+from utils.datasets import VideoFrameDataset
 
 import models_mae3d
 from engine_pretrain import train_one_epoch
@@ -68,7 +68,7 @@ def get_args_parser():
     parser.add_argument('--data_path', default='/home/cyril/Datasets/MAE/', type=str,
                         help='dataset path')
     parser.add_argument('--num_segments', default=4, type=int)
-    parser.add_argument('--frames_per_segment', default=2, type=int)
+    parser.add_argument('--frames_per_segment', default=4, type=int)
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
