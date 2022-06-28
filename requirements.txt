@@ -1,3 +1,4 @@
 einops
 timm
 wandb
+pandas
