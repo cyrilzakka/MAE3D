@@ -12,14 +12,7 @@ This is an unofficial PyTorch/GPU implementation of [Masked Autoencoders As Spat
   title   = {Masked Autoencoders As Spatiotemporal Learners},
   year    = {2022},
 }
-```
-
-## TODOs
-- [x] Add pre-training code
-- [x] Switch to learned spatiotemporal embedding
-- [x] Add visualization code
-- [ ] Test code
-- [ ] Add prospective and retrospective frame masking 
+``` 
 
 
 ## Getting Started
