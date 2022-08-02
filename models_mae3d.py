@@ -22,7 +22,7 @@ from utils.patch_embed import PatchEmbed3D
 
 
 class MAE3D(nn.Module):
-    """ 3D Masked Autoencoder for Surgical Vision with VisionTransformer backbone
+    """  3D Masked Autoencoder with ViT Backbone
     """
     def __init__(self, img_size=224, patch_size=16, in_chans=3, num_frames=16, temp_stride=2,
                  embed_dim=1024, depth=24, num_heads=16,
