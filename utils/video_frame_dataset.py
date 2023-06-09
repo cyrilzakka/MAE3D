@@ -18,9 +18,12 @@ from torch.utils.data import Dataset
 from torchvision.io import VideoReader
 from torchvision.transforms import Compose, InterpolationMode, Normalize, RandomResizedCrop
 
-from util.decoder.exceptions import InsufficientVideoLengthError
-from util.decoder.transform import create_random_augment
-from util.retry import DataloadFailure, retry_random_idx_on_err
+from utils.transform import create_random_augment
+from utils.retry import DataloadFailure, retry_random_idx_on_err
+
+
+class InsufficientVideoLengthError(Exception):
+    pass
 
 
 def collate_batch(list_of_examples):

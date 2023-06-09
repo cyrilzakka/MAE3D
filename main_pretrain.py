@@ -31,7 +31,6 @@ import models_mae3d
 from engine_pretrain import train_one_epoch
 import wandb
 
-wandb.init(project="SuTr", entity="cyrilzakka")
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
@@ -146,7 +145,7 @@ def main(args):
     model.to(device)
 
     model_without_ddp = model
-    print("Model = %s" % str(model_without_ddp))
+    # print("Model = %s" % str(model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
 
@@ -164,7 +163,7 @@ def main(args):
         model_without_ddp = model.module
 
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
+    param_groups = optim_factory.param_groups_weight_decay(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
@@ -176,6 +175,8 @@ def main(args):
         loss_scaler=loss_scaler,
     )
 
+    wandb.init(project="SuTr", entity="akashc")
+    wandb.config.update(args)
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
@@ -208,7 +209,6 @@ def main(args):
 if __name__ == '__main__':
     args = get_args_parser()
     args = args.parse_args()
-    wandb.config.update(args)
 
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
