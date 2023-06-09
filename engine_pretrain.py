@@ -74,11 +74,11 @@ def train_one_epoch(
 
         num_frames = samples.size(0) * samples.size(2)
         fps = num_frames / (fwd_bwd_time + data_time)
-        print(
-            f"step {data_iter_step} | loss {loss_value:.4f} | fwdbwd_t {fwd_bwd_time:.4f} | "
-            f"data_t {data_time:.4f} | fps {fps:.4f}"
-        )
         if data_iter_step % 10 == 0 and misc.is_main_process():
+            print(
+                f"step {data_iter_step} | loss {loss_value:.4f} | fwdbwd_t {fwd_bwd_time:.4f} | "
+                f"data_t {data_time:.4f} | fps {fps:.4f}"
+            )
             wandb.log(
                 {
                     'loss': loss_value,
@@ -108,7 +108,7 @@ def train_one_epoch(
         data_start = default_timer()
 
     epoch_time = default_timer() - epoch_start
-    pritn(f"Epoch time: {epoch_time}")
+    print(f"Epoch time: {epoch_time}")
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
