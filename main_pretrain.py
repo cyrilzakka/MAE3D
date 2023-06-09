@@ -25,13 +25,12 @@ import timm.optim.optim_factory as optim_factory
 
 import utils.misc as misc
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
-from utils.datasets import VideoFrameDataset
+from utils.video_frame_dataset import VideoFrameDataset
 
 import models_mae3d
 from engine_pretrain import train_one_epoch
 import wandb
 
-wandb.init(project="SuTr", entity="cyrilzakka")
 
 def get_args_parser():
     parser = argparse.ArgumentParser('MAE pre-training', add_help=False)
@@ -61,14 +60,18 @@ def get_args_parser():
                         help='base learning rate: absolute_lr = base_lr * total_batch_size / 256')
     parser.add_argument('--min_lr', type=float, default=0., metavar='LR',
                         help='lower lr bound for cyclic schedulers that hit 0')
-    parser.add_argument('--warmup_epochs', type=int, default=40, metavar='N',
+    parser.add_argument('--warmup_epochs', type=int, default=0, metavar='N',
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/home/cyril/Datasets/MAE/', type=str,
-                        help='dataset path')
-    parser.add_argument('--num_segments', default=4, type=int)
-    parser.add_argument('--frames_per_segment', default=4, type=int)
+    parser.add_argument(
+        '--data_path',
+        default='/scratch/groups/willhies/echo/echoai/combined.csv',
+        type=str,
+        help='dataset path',
+    )
+    parser.add_argument('--num_frames', default=32, type=int)
+    parser.add_argument('--stride', default=8, type=int)
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
@@ -110,17 +113,12 @@ def main(args):
 
     cudnn.benchmark = True
 
-    # simple augmentation
-    transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=Image.BICUBIC),  # 3 is bicubic
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset_train = VideoFrameDataset(root_path=os.path.join(args.data_path, 'train'), annotationfile_path=os.path.join(args.data_path, 'ledger.csv'),
-                 num_segments= args.num_segments,
-                 frames_per_segment = args.frames_per_segment,
-                 transform = transform_train,
-                 test_mode = False)
+    dataset_train = VideoFrameDataset(
+        ledger_path=args.data_path,
+        num_frames=args.num_frames,
+        stride=args.stride,
+        do_augmentation=True,
+    )
     print(dataset_train)
 
     if True:  # args.distributed:
@@ -140,16 +138,19 @@ def main(args):
         pin_memory=args.pin_mem,
         drop_last=True,
     )
-    
+
     # define the model
-    model = models_mae3d.__dict__[args.model](num_frames=int(args.num_segments*args.frames_per_segment), norm_pix_loss=args.norm_pix_loss)
+    model = models_mae3d.__dict__[args.model](
+        num_frames=args.num_frames,
+        norm_pix_loss=args.norm_pix_loss,
+    )
     model.to(device)
 
     model_without_ddp = model
-    print("Model = %s" % str(model_without_ddp))
+    # print("Model = %s" % str(model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
-    
+
     if args.lr is None:  # only base_lr is specified
         args.lr = args.blr * eff_batch_size / 256
 
@@ -162,15 +163,22 @@ def main(args):
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
-    
+
     # following timm: set wd as 0 for bias and norm layers
-    param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
+    param_groups = optim_factory.param_groups_weight_decay(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    misc.load_model(
+        args=args,
+        model_without_ddp=model_without_ddp,
+        optimizer=optimizer,
+        loss_scaler=loss_scaler,
+    )
 
+    wandb.init(project="SuTr", entity="akashc")
+    wandb.config.update(args)
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
@@ -182,14 +190,16 @@ def main(args):
             log_writer=None,
             args=args
         )
-        if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir:
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        'epoch': epoch,}
-            
+        log_stats = {
+            **{f'train_{k}': v for k, v in train_stats.items()},
+            'epoch': epoch,
+        }
+
         if misc.is_main_process():
             wandb.log(log_stats)
 
@@ -201,7 +211,6 @@ def main(args):
 if __name__ == '__main__':
     args = get_args_parser()
     args = args.parse_args()
-    wandb.config.update(args)
 
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
