@@ -64,8 +64,12 @@ def get_args_parser():
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/scratch/users/akashc/steffner_echo_processed', type=str,
-                        help='dataset path')
+    parser.add_argument(
+        '--data_path',
+        default='/scratch/groups/willhies/echo/echoai/combined.csv',
+        type=str,
+        help='dataset path',
+    )
     parser.add_argument('--num_frames', default=32, type=int)
     parser.add_argument('--stride', default=8, type=int)
     parser.add_argument('--output_dir', default='./output_dir',
@@ -110,12 +114,10 @@ def main(args):
     cudnn.benchmark = True
 
     dataset_train = VideoFrameDataset(
-        root_path=args.data_path,
-        split='train',
+        ledger_path=args.data_path,
         num_frames=args.num_frames,
         stride=args.stride,
         do_augmentation=True,
-        is_eval=False,
     )
     print(dataset_train)
 
@@ -188,7 +190,7 @@ def main(args):
             log_writer=None,
             args=args
         )
-        if args.output_dir and (epoch % 20 == 0 or epoch + 1 == args.epochs):
+        if args.output_dir:
             misc.save_model(
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)

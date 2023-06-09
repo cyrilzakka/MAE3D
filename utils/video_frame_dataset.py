@@ -59,8 +59,7 @@ class VideoFrameDataset(Dataset):
 
     def __init__(
         self,
-        root_path: str,
-        split: str,
+        ledger_path: str,
         num_frames: int = 8,
         stride: int = 4,
         do_augmentation=True,
@@ -68,11 +67,10 @@ class VideoFrameDataset(Dataset):
     ):
         super().__init__()
 
-        self.root_path = Path(root_path)
-        assert split in {'train', 'test', 'val'}, f"Inalid split {split}!"
+        self.ledger_path = Path(ledger_path)
         self.num_frames = num_frames
         self.stride = stride
-        self.is_eval = is_eval or split != 'train'
+        self.is_eval = is_eval
 
         # Don't do augmentation for testing splits
         self.do_augmentation = do_augmentation and not self.is_eval
@@ -96,12 +94,13 @@ class VideoFrameDataset(Dataset):
 
         self.transforms = Compose(xforms + [Normalize(self.MEAN, self.STD)])
 
-        self.csv_path = self.root_path / f'{split}.csv'
-        self.video_metadata = pd.read_csv(self.csv_path)
-        logging.info(f"Instantiated {self.__class__.__name__} based on {str(self.csv_path)}")
+        self.video_metadata = pd.read_csv(self.ledger_path)
+        logging.info(f"Instantiated {self.__class__.__name__} based on {str(self.ledger_path)}")
         logging.info(f"Number of examples: {len(self)}")
 
     def _get_start_index(self, num_frames) -> int:
+        if num_frames <= (self.num_frames - 1) * self.stride + 1:
+            return 0
         return random.randint(0, num_frames - ((self.num_frames - 1) * self.stride))
 
     @retry_random_idx_on_err(do_retry=True)
@@ -122,10 +121,10 @@ class VideoFrameDataset(Dataset):
 
         # Get the number of frames in sampled video
         meta_row = self.video_metadata.iloc[idx]
-        video_path, afib_label = Path(meta_row['avi_path']), int(meta_row['postop_afib_label'])
+        video_path = Path(meta_row['avi_path'])
 
         # Make inputs (C, T, H, W) for Conv3d
-        return self._get_frames(video_path).permute(1, 0, 2, 3), torch.tensor([afib_label])
+        return self._get_frames(video_path).permute(1, 0, 2, 3)
 
     def _get_frames(self, video_path: Union[Path, str], start_index: Optional[int] = None):
         """
@@ -148,11 +147,11 @@ class VideoFrameDataset(Dataset):
 
         num_frames = int(video_meta['fps'][0] * video_meta['duration'][0])
 
-        if num_frames < self.stride * (self.num_frames - 1) + 1:
-            raise InsufficientVideoLengthError(
-                f"Video {str(video_path)} has {num_frames} frames, which is "
-                f"insufficient for parameters {self.num_frames=}, {self.stride=}"
-            )
+        # if num_frames < self.stride * (self.num_frames - 1) + 1:
+        #     raise InsufficientVideoLengthError(
+        #         f"Video {str(video_path)} has {num_frames} frames, which is "
+        #         f"insufficient for parameters {self.num_frames=}, {self.stride=}"
+        #     )
 
         start_index = self._get_start_index(num_frames)
         start_s = start_index / video_meta['fps'][0]
