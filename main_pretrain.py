@@ -25,7 +25,7 @@ import timm.optim.optim_factory as optim_factory
 
 import utils.misc as misc
 from utils.misc import NativeScalerWithGradNormCount as NativeScaler
-from utils.datasets import VideoFrameDataset
+from utils.video_frame_dataset import VideoFrameDataset
 
 import models_mae3d
 from engine_pretrain import train_one_epoch
@@ -65,10 +65,10 @@ def get_args_parser():
                         help='epochs to warmup LR')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/home/cyril/Datasets/MAE/', type=str,
+    parser.add_argument('--data_path', default='/scratch/users/akashc/steffner_echo_processed', type=str,
                         help='dataset path')
-    parser.add_argument('--num_segments', default=4, type=int)
-    parser.add_argument('--frames_per_segment', default=4, type=int)
+    parser.add_argument('--num_frames', default=32, type=int)
+    parser.add_argument('--stride', default=8, type=int)
     parser.add_argument('--output_dir', default='./output_dir',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
@@ -110,17 +110,14 @@ def main(args):
 
     cudnn.benchmark = True
 
-    # simple augmentation
-    transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=Image.BICUBIC),  # 3 is bicubic
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset_train = VideoFrameDataset(root_path=os.path.join(args.data_path, 'train'), annotationfile_path=os.path.join(args.data_path, 'ledger.csv'),
-                 num_segments= args.num_segments,
-                 frames_per_segment = args.frames_per_segment,
-                 transform = transform_train,
-                 test_mode = False)
+    dataset_train = VideoFrameDataset(
+        root_path=args.data_path,
+        split='train',
+        num_frames=args.num_frames,
+        stride=args.stride,
+        do_augmentation=True,
+        is_eval=False,
+    )
     print(dataset_train)
 
     if True:  # args.distributed:
@@ -140,16 +137,19 @@ def main(args):
         pin_memory=args.pin_mem,
         drop_last=True,
     )
-    
+
     # define the model
-    model = models_mae3d.__dict__[args.model](num_frames=int(args.num_segments*args.frames_per_segment), norm_pix_loss=args.norm_pix_loss)
+    model = models_mae3d.__dict__[args.model](
+        num_frames=args.num_frames,
+        norm_pix_loss=args.norm_pix_loss,
+    )
     model.to(device)
 
     model_without_ddp = model
     print("Model = %s" % str(model_without_ddp))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
-    
+
     if args.lr is None:  # only base_lr is specified
         args.lr = args.blr * eff_batch_size / 256
 
@@ -162,14 +162,19 @@ def main(args):
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
-    
+
     # following timm: set wd as 0 for bias and norm layers
     param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
     optimizer = torch.optim.AdamW(param_groups, lr=args.lr, betas=(0.9, 0.95))
     print(optimizer)
     loss_scaler = NativeScaler()
 
-    misc.load_model(args=args, model_without_ddp=model_without_ddp, optimizer=optimizer, loss_scaler=loss_scaler)
+    misc.load_model(
+        args=args,
+        model_without_ddp=model_without_ddp,
+        optimizer=optimizer,
+        loss_scaler=loss_scaler,
+    )
 
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
@@ -187,9 +192,11 @@ def main(args):
                 args=args, model=model, model_without_ddp=model_without_ddp, optimizer=optimizer,
                 loss_scaler=loss_scaler, epoch=epoch)
 
-        log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        'epoch': epoch,}
-            
+        log_stats = {
+            **{f'train_{k}': v for k, v in train_stats.items()},
+            'epoch': epoch,
+        }
+
         if misc.is_main_process():
             wandb.log(log_stats)
 
